@@ -1799,7 +1799,7 @@ class FeesController extends AppBaseController
             ->join("class_student as cs", "s.id", "=", "cs.student_id")
             ->join("class_organization as co", "co.id", "=", "cs.organclass_id")
             ->leftJoin("student_fees_new as sfn", "cs.id", "=", "sfn.class_student_id")
-            ->leftJoin("fees_new as fn", "sfn.fees_id", "=", "fn.id")
+            ->leftJoin('fees_new as fn', 'fn.id', '=', 'sfn.fees_id')
             ->select(
                 "s.id as student_id",
                 "s.nama as student_name",
@@ -1808,13 +1808,18 @@ class FeesController extends AppBaseController
                 "fn.id as fee_id",
                 "fn.name as fee_name",
                 "fn.category as fee_category",
-                "sfn.status as fee_status"
+                "sfn.status as fee_status",
+                "co.class_id as class_id"
             )
             ->where("co.organization_id", "=", $oid)
-            ->where("co.class_id", "=", $classId)
-            ->where("s.id", "LIKE", isset($studentId) ? $studentId : "%%")
-            ->where("cs.status", "!=", -1)
-            ->where("fn.status", 1)
+            ->when(isset($classId), function ($query) use ($classId) {
+                $query->where('co.class_id', '=', $classId);
+            })
+            ->when(isset($studentId), function ($query) use ($studentId) {
+                $query->where('s.id', '=', $studentId);
+            })
+            ->where('fn.status', '=', 1)
+            ->where('cs.status', '=', 1)
             ->orderBy("fee_category", "asc")
             ->orderBy("fee_name", "asc")
             ->get()
@@ -1873,6 +1878,7 @@ class FeesController extends AppBaseController
                     "student_name" => $firstGroup->student_name,
                     "gender" => $firstGroup->gender,
                     "student_status" => $firstGroup->student_status,
+                    "class_id" => $firstGroup->class_id,
                     // get fee details from each item in the collection 
                     "fees" => $group->map(function ($item) {
                         return [
@@ -1905,10 +1911,10 @@ class FeesController extends AppBaseController
 
         $table = Datatables::of($data);
 
-        $table->addColumn('action', function ($row) use ($oid, $classId, $routeName) {
+        $table->addColumn('action', function ($row) use ($oid, $routeName) {
             return "<div style='text-align: center;'>
                  <a style='margin: 0 auto;' href='" .
-                route($routeName, ["oid" => $oid, "classId" => $classId, "studentId" => $row["student_id"]]) .
+                route($routeName, ["oid" => $oid, "classId" => $row["class_id"], "studentId" => $row["student_id"]]) .
                 "'" .
                 (($row["student_status"] != 1)
                     ? " class='btn btn-primary disabled' aria-disabled='true'>"
